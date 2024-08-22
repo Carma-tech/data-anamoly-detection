@@ -1,8 +1,8 @@
 {
-  "name": "data-anamoly-detection",
+  "name": "data-anomaly-detection",
   "version": "0.1.0",
   "bin": {
-    "data-anamoly-detection": "bin/data-anamoly-detection.js"
+    "data-anamoly-detection": "bin/app.js"
   },
   "scripts": {
     "build": "tsc",
