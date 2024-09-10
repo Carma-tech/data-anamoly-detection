@@ -26,7 +26,7 @@ This project is designed to build an automated data pipeline for detecting anoma
 + __cdk/scripts/anomaly_detection_blog_data_generator_job.py:__ The Python script executed by AWS Glue to process datasets, apply data quality checks, and store the data.
 + __cdk/data:__ Contains sample datasets for `yellow`, `green`, `fhv`, and `fhvh tripdata`.
 
-###### Note: The `fhvh_tripdata` is not available in `data` folder because that's a large amount of dataset and the size is 500 MB, so this will take some time when cloning repo. You can download that dataset from the following link.
+###### Note: The `fhvh_tripdata` and `yellow_tripdata` are not available in `data` folder because of large amount of dataset, so that causes error while deploying or cloning repository. Download the these two datasets and paste in `data` folder.
 
 [https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page)
 
@@ -62,6 +62,17 @@ This will provision the required AWS infrastructure in your AWS account.
 
 The CDK deployment will automatically upload the datasets and the Glue job scripts to the S3 bucket created during the deployment.
 
+To upload all the files to s3 bucket run the following command:
+```bash
+aws s3 cp ./data s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/ --recursive
+```
+
+Or 
+
+```bash
+aws s3 sync ./data s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/
+```
+
 ### 3: Run the Glue Job for a Specific Dataset
 
 You can just start the Glue job for the default dataset:
@@ -77,7 +88,7 @@ You can start the Glue job for a specific dataset by passing the appropriate `PR
 ```bash
 aws glue start-job-run \
   --job-name anomaly_detection_blog_data_generator_job \
-  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/green_tripdata_2024-05.parquet","--TABLE_NAME":"yellow_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
+  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/green_tripdata_2024-05.parquet","--TABLE_NAME":"green_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
 ```
 
 This command starts the Glue job, which processes the green_tripdata dataset, applies data quality checks, and stores the processed data in S3.
@@ -97,14 +108,14 @@ aws glue start-job-run \
 ```bash
 aws glue start-job-run \
   --job-name anomaly_detection_blog_data_generator_job \
-  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fhvh_tripdata_2024-05.parquet","--TABLE_NAME":"yellow_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
+  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fhvh_tripdata_2024-06.parquet","--TABLE_NAME":"yellow_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
 ```
 
 * For `fhv_tripdata`
 ```bash
 aws glue start-job-run \
   --job-name anomaly_detection_blog_data_generator_job \
-  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fvh_tripdata_2024-05.parquet","--TABLE_NAME":"yellow_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
+  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fvh_tripdata_2024-06.parquet","--TABLE_NAME":"yellow_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
 ```
 
 

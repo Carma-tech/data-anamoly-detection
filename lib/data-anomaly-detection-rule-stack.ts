@@ -13,7 +13,7 @@ export class DataAnomalyDetectionRuleStack extends cdk.Stack {
 
     // Create S3 bucket
     const anomalyBucket = new s3.Bucket(this, 'AnomalyDetectionBlogBucket', {
-      bucketName: 'anomaly-detection-data-bucket',
+      // bucketName: 'anomaly-detection-data-bucket',
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
