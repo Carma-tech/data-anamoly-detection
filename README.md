@@ -108,14 +108,14 @@ aws glue start-job-run \
 ```bash
 aws glue start-job-run \
   --job-name anomaly_detection_blog_data_generator_job \
-  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fhvh_tripdata_2024-06.parquet","--TABLE_NAME":"yellow_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
+  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fhvh_tripdata_2024-06.parquet","--TABLE_NAME":"fhvh_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
 ```
 
 * For `fhv_tripdata`
 ```bash
 aws glue start-job-run \
   --job-name anomaly_detection_blog_data_generator_job \
-  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fvh_tripdata_2024-06.parquet","--TABLE_NAME":"yellow_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
+  --arguments '{"--PREFIX":"s3://anomaly-detection-data-bucket/anomaly_detection_blog/data/fvh_tripdata_2024-06.parquet","--TABLE_NAME":"fhv_tripdata","---YEAR":"2024","--MONTH":"5","--DAY":"1"}'
 ```
 
 

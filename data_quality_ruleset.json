@@ -1,0 +1,27 @@
+{
+    "Rules": [
+      {
+        "RowCount": "> 1000",
+        "Name": "RowCountRule",
+        "Description": "Ensure that the row count is greater than 1000"
+      },
+      {
+        "ColumnValues": {
+          "Column": "fare_amount",
+          "Between": [1, 100]
+        },
+        "Name": "FareAmountRule",
+        "Description": "Fare amount between 1 and 100"
+      }
+    ],
+    "Analyzers": [
+      {
+        "DistinctValuesCount": {
+          "Column": "PULocationID"
+        }
+      },
+      {
+        "RowCount": ">1000"
+      }
+    ]
+  }

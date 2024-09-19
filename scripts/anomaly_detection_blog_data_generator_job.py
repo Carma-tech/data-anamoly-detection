@@ -10,7 +10,10 @@ from awsgluedq.transforms import EvaluateDataQuality
 
 # Initialize Glue context
 args = getResolvedOptions(sys.argv, [
-                          'JOB_NAME', 'BUCKET_NAME', 'BUCKET_PREFIX', 'DATABASE_NAME', 'TABLE_NAME', 'PREFIX', 'YEAR', 'MONTH', 'DAY'])
+                          'JOB_NAME', 'BUCKET_NAME', 'BUCKET_PREFIX',
+                          'DATABASE_NAME', 'TABLE_NAME',
+                          'PREFIX', 'YEAR', 'MONTH', 'DAY'
+                          ])
 sc = SparkContext()
 glueContext = GlueContext(sc)
 spark = glueContext.spark_session
@@ -19,7 +22,8 @@ job.init(args['JOB_NAME'], args)
 
 # Define the input data path
 input_data_path = f"s3://{args['BUCKET_NAME']}/{args['BUCKET_PREFIX']}/data/"
-prefix = args.get('PREFIX', f'{input_data_path}/yellow_tripdata_2024-05.parquet')
+prefix = args.get(
+    'PREFIX', f'{input_data_path}/yellow_tripdata_2024-05.parquet')
 
 print('prefix: ', prefix)
 
@@ -27,36 +31,55 @@ print('prefix: ', prefix)
 df = spark.read.parquet(prefix)
 
 # Filter by partition
-year = args.get('YEAR')
-month = args.get('MONTH')
-day = args.get('DAY')
+year, month, day = args.get('YEAR'), args.get('MONTH'), args.get('DAY')
 
 print(f'Partition: {year}-{month}-{day}')
 
 # Identify dataset type by column names
 columns = df.columns
+# Identify dataset type by column names
+columns = df.columns
 if 'tpep_pickup_datetime' in columns:
     dataset_type = 'yellow'
-    df = df.withColumn('tpep_pickup_datetime', F.col('tpep_pickup_datetime').cast(T.TimestampType()))
-    df = df.withColumn('tpep_dropoff_datetime', F.col('tpep_dropoff_datetime').cast(T.TimestampType()))
+    pickup_datetime_col = 'tpep_pickup_datetime'
+    dropoff_datetime_col = 'tpep_dropoff_datetime'
 elif 'lpep_pickup_datetime' in columns:
     dataset_type = 'green'
-    df = df.withColumn('lpep_pickup_datetime', F.col('lpep_pickup_datetime').cast(T.TimestampType()))
-    df = df.withColumn('lpep_dropoff_datetime', F.col('lpep_dropoff_datetime').cast(T.TimestampType()))
+    pickup_datetime_col = 'lpep_pickup_datetime'
+    dropoff_datetime_col = 'lpep_dropoff_datetime'
 elif 'hvfhs_license_num' in columns:
     dataset_type = 'fhvh'
+    pickup_datetime_col = 'pickup_datetime'
+    dropoff_datetime_col = 'dropoff_datetime'
 elif 'pickup_datetime' in columns:
     dataset_type = 'fhv'
+    pickup_datetime_col = 'pickup_datetime'
+    dropoff_datetime_col = 'dropOff_datetime'
 else:
     raise ValueError("Unknown dataset type based on columns.")
 
 print(f'Processing {dataset_type} dataset.')
 
 # Data Preprocessing Steps common for all datasets
+df = df.withColumn(pickup_datetime_col, F.col(
+    pickup_datetime_col).cast(T.TimestampType()))
+df = df.withColumn(dropoff_datetime_col, F.col(
+    dropoff_datetime_col).cast(T.TimestampType()))
 
-# Handle Missing Values based on dataset type
+# Add partition keys (year, month, day) for all dataset types
+df = df.withColumn('year', F.year(F.col(pickup_datetime_col)))
+df = df.withColumn('month', F.month(F.col(pickup_datetime_col)))
+df = df.withColumn('day', F.dayofmonth(F.col(pickup_datetime_col)))
+
+# Filter based on the partition predicate provided
+if year and month and day:
+    partition_filter = (F.col('year') == year) & (
+        F.col('month') == month) & (F.col('day') == day)
+    df = df.filter(partition_filter)
+
+# Data Preprocessing Steps common for all datasets
 if dataset_type in ['yellow', 'green']:
-    df = df.fillna({
+    common_columns = {
         'passenger_count': 0.0,
         'trip_distance': 0.0,
         'RatecodeID': 1,
@@ -68,8 +91,12 @@ if dataset_type in ['yellow', 'green']:
         'improvement_surcharge': 0.0,
         'total_amount': 0.0,
         'congestion_surcharge': 0.0,
-        'Airport_fee': 0.0,
-    })
+    }
+
+    if dataset_type == 'yellow':
+        common_columns['Airport_fee'] = 0.0
+
+    df = df.fillna(common_columns)
 
     df = df.fillna({
         'store_and_fwd_flag': 'N',
@@ -78,32 +105,47 @@ if dataset_type in ['yellow', 'green']:
         'payment_type': 1,
     })
 
-    df = df.withColumn('fare_amount', F.when(F.col('fare_amount') < 0, 0.0).otherwise(F.col('fare_amount')))
-    df = df.withColumn('total_amount', F.when(F.col('total_amount') < 0, 0.0).otherwise(F.col('total_amount')))
-    df = df.filter((F.col('fare_amount') >= 0) & (F.col('fare_amount') <= 500000))
+    df = df.withColumn('fare_amount', F.when(
+        F.col('fare_amount') < 0, 0.0).otherwise(F.col('fare_amount')))
+    df = df.withColumn('total_amount', F.when(
+        F.col('total_amount') < 0, 0.0).otherwise(F.col('total_amount')))
+    df = df.filter((F.col('fare_amount') >= 0) &
+                   (F.col('fare_amount') <= 500000))
 
-    # Add partition keys (year, month, day) by extracting them from tpep_pickup_datetime
-    df = df.withColumn('year', F.year(F.col('tpep_pickup_datetime')))
-    df = df.withColumn('month', F.month(F.col('tpep_pickup_datetime')))
-    df = df.withColumn('day', F.dayofmonth(F.col('tpep_pickup_datetime')))
+    # Add trip_duration
+    pickup_datetime_col = 'tpep_pickup_datetime' if dataset_type == 'yellow' else 'lpep_pickup_datetime'
+    dropoff_datetime_col = 'tpep_dropoff_datetime' if dataset_type == 'yellow' else 'lpep_dropoff_datetime'
 
-    # Filter based on the partition predicate provided
-    partition_filter = (F.col('year') == year) & (F.col('month') == month) & (F.col('day') == day)
-    df = df.filter(partition_filter)
+    df = df.withColumn('year', F.year(F.col(pickup_datetime_col)))
+    df = df.withColumn('month', F.month(F.col(pickup_datetime_col)))
+    df = df.withColumn('day', F.dayofmonth(F.col(pickup_datetime_col)))
 
-    
     df = df.withColumn('trip_duration',
-                       (F.unix_timestamp('tpep_dropoff_datetime' if dataset_type == 'yellow' else 'lpep_dropoff_datetime') - 
-                        F.unix_timestamp('tpep_pickup_datetime' if dataset_type == 'yellow' else 'lpep_pickup_datetime')) / 60)
+                       (F.unix_timestamp(dropoff_datetime_col) -
+                        F.unix_timestamp(pickup_datetime_col)) / 60)
+
     df = df.filter(F.col('trip_duration') > 0)
 
 elif dataset_type == 'fhvh':
-    df = df.withColumn('pickup_datetime', F.col('pickup_datetime').cast(T.TimestampType()))
-    df = df.withColumn('dropoff_datetime', F.col('dropoff_datetime').cast(T.TimestampType()))
+    df = df.withColumn('pickup_datetime', F.col(
+        'pickup_datetime').cast(T.TimestampType()))
+    df = df.withColumn('dropoff_datetime', F.col(
+        'dropoff_datetime').cast(T.TimestampType()))
+
+    df = df.withColumn('year', F.year(F.col('pickup_datetime')))
+    df = df.withColumn('month', F.month(F.col('pickup_datetime')))
+    df = df.withColumn('day', F.dayofmonth(F.col('pickup_datetime')))
 
 elif dataset_type == 'fhv':
-    df = df.withColumn('pickup_datetime', F.col('pickup_datetime').cast(T.TimestampType()))
-    df = df.withColumn('dropOff_datetime', F.col('dropOff_datetime').cast(T.TimestampType()))
+    df = df.withColumn('pickup_datetime', F.col(
+        'pickup_datetime').cast(T.TimestampType()))
+    df = df.withColumn('dropOff_datetime', F.col(
+        'dropOff_datetime').cast(T.TimestampType()))
+
+    # Add partition columns
+    df = df.withColumn('year', F.year(F.col('pickup_datetime')))
+    df = df.withColumn('month', F.month(F.col('pickup_datetime')))
+    df = df.withColumn('day', F.dayofmonth(F.col('pickup_datetime')))
 
 # Write the cleaned and processed data back to S3
 output_data_path = f"s3://{args['BUCKET_NAME']}/{args['BUCKET_PREFIX']}/processed_data/{dataset_type}/"
@@ -132,7 +174,7 @@ dq_results = EvaluateDataQuality.apply(
     frame=dynamic_frame,
     ruleset=ruleset,
     publishing_options={
-        "dataQualityEvaluationContext": 'default_context' 
+        "dataQualityEvaluationContext": 'default_context'
     }
 )
 print('Evaluation results: ', dq_results)
